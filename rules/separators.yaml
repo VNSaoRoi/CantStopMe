@@ -1,0 +1,49 @@
+# Command chaining / injection separators (PAT, Root-Me ch53)
+category: separators
+rules:
+  - id: newline_lf
+    name: Newline LF (%0a) command separator
+    priority: 10
+    transform: newline_prefix
+    exclusive_group: cmd_separator
+    contexts: [general, web_cmd_inject, php_wrapper]
+    target: injection_prefix
+    triggers:
+      blocked_chars: [";", "|", "&"]
+    references:
+      - "PAT: Bypass With A Line Return"
+      - "https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/Command%20Injection"
+      - "Root-Me ch53 / exploit4040"
+    defense:
+      - "Reject %0a and bare newlines in untrusted input"
+      - "Use FILTER_VALIDATE_IP + escapeshellarg"
+
+  - id: newline_cr
+    name: Carriage return (%0d) separator
+    priority: 11
+    transform: newline_cr_prefix
+    exclusive_group: cmd_separator
+    contexts: [general, web_cmd_inject]
+    target: injection_prefix
+    triggers:
+      blocked_chars: [";", "|", "&"]
+      blocked_tokens: ["newline"]
+    references:
+      - "PAT: line return variants"
+    defense:
+      - "Reject %0d in web parameters"
+
+  - id: backslash_newline_break
+    name: Backslash-newline inside tokens
+    priority: 12
+    transform: backslash_newline_break
+    contexts: [general, bash, sh, web_cmd_inject]
+    triggers:
+      blocked_chars: ["/"]
+      blocked_tokens: ["space"]
+    requires_not_blocked: ["\\"]
+    references:
+      - "PAT: Bypass With Backslash Newline"
+    notes: "Splits path/command across lines: cat%20/et%5C%0Ac/pa%5C%0Asswd"
+    defense:
+      - "Normalize backslash-newline before validation"

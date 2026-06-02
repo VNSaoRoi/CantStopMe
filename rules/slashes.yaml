@@ -1,0 +1,73 @@
+# Slash and path construction (PAT + Commix slash2env)
+category: slashes
+rules:
+  - id: slash_home_expand
+    name: "HOME slice path slash"
+    priority: 30
+    transform: slash_home_expand
+    exclusive_group: slash
+    contexts: [general, bash, sh, zsh, web_cmd_inject]
+    triggers:
+      blocked_chars: ["/", "\\"]
+    requires_not_blocked: ["$", ":"]
+    references:
+      - "PAT: ${HOME:0:1}etc${HOME:0:1}passwd"
+    defense:
+      - "Allowlist paths; no shell concatenation"
+
+  - id: brace_slash_path
+    name: "Brace expansion path (no slash char)"
+    priority: 30
+    transform: brace_slash_path
+    exclusive_group: slash
+    contexts: [bash, sh]
+    triggers:
+      blocked_chars: ["/"]
+    requires_not_blocked: ["{", "}", ","]
+    references:
+      - "PAT: {cat,/etc/passwd} and {,/?s?/?i?/c?t,/e??/p??s??,}"
+    notes: "Works for known paths like /etc/passwd without using $"
+    defense:
+      - "Reject brace expansion in user input"
+
+  - id: slash_path_env
+    name: "PATH env slash (slash2env)"
+    priority: 31
+    transform: slash_path_env
+    exclusive_group: slash
+    contexts: [general, bash, sh, web_cmd_inject]
+    triggers:
+      blocked_chars: ["/"]
+    requires_not_blocked: ["$", "%"]
+    references:
+      - "Commix: slash2env"
+    defense:
+      - "Block ${PATH%%...} expansion patterns"
+
+  - id: wildcard_path
+    name: "Glob wildcards in paths"
+    priority: 32
+    transform: wildcard_path
+    contexts: [general, bash, sh, zsh]
+    triggers:
+      blocked_chars: ["/"]
+    requires_not_blocked: ["?", "*"]
+    references:
+      - "PAT: /???/??t /???/p??s??"
+    notes: "Heuristic — best for common paths like /etc/passwd"
+    defense:
+      - "Do not pass user input into shell; canonicalize paths"
+
+  - id: hex_slash_path
+    name: "Build path via echo -e hex"
+    priority: 33
+    transform: hex_slash_path
+    exclusive_group: slash
+    contexts: [general, bash, sh, web_cmd_inject]
+    triggers:
+      blocked_chars: ["/", "\\"]
+    requires_not_blocked: ["$"]
+    references:
+      - "PAT: echo -e \\x2f\\x65\\x74\\x63..."
+    defense:
+      - "Block echo -e and hex escape chains"

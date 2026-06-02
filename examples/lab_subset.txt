@@ -1,0 +1,5 @@
+# Optional overlay — merge on top of blacklist_pool/pool.yaml
+# Example: simulate a stricter filter than the full pool
+char:;
+keyword:cat
+space

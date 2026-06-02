@@ -1,0 +1,60 @@
+# Encoding / substitution layers (PAT + Commix + RodricBr)
+category: encoding
+rules:
+  - id: cmd_substitution
+    name: "Command substitution $(echo ...)"
+    priority: 50
+    transform: cmd_substitution
+    contexts: [general, bash, sh, zsh, web_cmd_inject]
+    triggers:
+      blocked_keywords: ["*"]
+    requires_not_blocked: ["$", "(", ")", "`"]
+    references:
+      - "PAT: Inside A Command — $(cmd)"
+    notes: "Wraps blocked command tokens in $(echo ...)"
+    defense:
+      - "Disable shell interpretation for user input"
+
+  - id: hex_encode_path
+    name: "Hex path via echo -e backticks"
+    priority: 51
+    transform: hex_encode_path
+    exclusive_group: encoding_path
+    contexts: [general, bash, sh, web_cmd_inject]
+    triggers:
+      blocked_chars: ["/"]
+    requires_not_blocked: ["`", "$"]
+    references:
+      - "PAT: Bypass Characters Filter Via Hex Encoding"
+    defense:
+      - "Block echo -e \\x and command substitution"
+
+  - id: variable_strip_path
+    name: "Variable expansion path cleanup"
+    priority: 52
+    transform: variable_strip_path
+    contexts: [bash, sh, zsh]
+    triggers:
+      blocked_chars: ["/"]
+    requires_not_blocked: ["$", "{", "}", "/"]
+    references:
+      - "PAT: cat ${test//hhh\\/hm/}"
+    notes: "Educational variant for obfuscated path variables"
+    defense:
+      - "Reject ${...//...} parameter expansion in input"
+
+  - id: bash_binary_c
+    name: "RodricBr binary ANSI-C here-string"
+    priority: 55
+    transform: bash_binary_c
+    exclusive_group: encoding_deep
+    reference_only: true
+    contexts: [bash, sh]
+    triggers:
+      blocked_chars: ["/", "\\"]
+    requires_not_blocked: ["$", "<"]
+    references:
+      - "https://github.com/RodricBr/Bash-Command-Injection"
+    notes: "Heavy obfuscation; lab/CTF — not for short web inject params"
+    defense:
+      - "Detect $((2#...)) chains and <<< here-strings"

@@ -1,0 +1,19 @@
+# Replace blacklisted command names with another binary (GTFOBins / PAT style)
+category: alternatives
+rules:
+  - id: command_substitute
+    name: "Swap blocked binary (ls->echo*, cat->tac, ...)"
+    priority: 18
+    transform: command_substitute
+    exclusive_group: cmd_substitute
+    contexts: [general, bash, sh, zsh, web_cmd_inject]
+    triggers:
+      blocked_keywords: ["*"]
+    references:
+      - "PAT: Command Injection README"
+      - "GTFOBins-style read/list alternatives"
+      - "Commix: FILE_READ / multiple clients"
+    notes: "Runs before keyword obfuscation; see cantstopme/engine/command_alternatives.py"
+    defense:
+      - "Allowlist binaries and arguments; block chained utilities"
+      - "Detect tac|tac, base64|base64 -d, find . patterns"

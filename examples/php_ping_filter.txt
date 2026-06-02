@@ -1,0 +1,53 @@
+# Blacklist derived from PHP filter() in ping lab (authorized testing only).
+# Source: operators + blocked command words (case-sensitive on server).
+#
+# Operators: & | ; \ / and space
+char:&
+char:|
+char:;
+char:\
+char:/
+space
+#
+# Blocked words (substring match, case-sensitive in PHP)
+keyword:whoami
+keyword:echo
+keyword:rm
+keyword:mv
+keyword:cp
+keyword:id
+keyword:curl
+keyword:wget
+keyword:cd
+keyword:sudo
+keyword:mkdir
+keyword:man
+keyword:history
+keyword:ln
+keyword:grep
+keyword:pwd
+keyword:file
+keyword:find
+keyword:kill
+keyword:ps
+keyword:uname
+keyword:hostname
+keyword:date
+keyword:uptime
+keyword:lsof
+keyword:ifconfig
+keyword:ipconfig
+keyword:ip
+keyword:tail
+keyword:netstat
+keyword:tar
+keyword:apt
+keyword:ssh
+keyword:scp
+keyword:less
+keyword:more
+keyword:awk
+keyword:head
+keyword:sed
+keyword:nc
+keyword:netcat

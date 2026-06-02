@@ -1,0 +1,124 @@
+# Command-name obfuscation (PAT + Commix tampers)
+category: keywords
+rules:
+  - id: break_blocked_substrings
+    name: "Break substring keyword hits (cp in TCP, …)"
+    priority: 5
+    transform: break_blocked_substrings
+    triggers:
+      blocked_keywords: ["*"]
+      keyword_match_substring: true
+    requires_not_blocked: ["$"]
+    references:
+      - "PHP strpos keyword lists match substrings inside innocent tokens"
+    defense:
+      - "Match whole tokens only; normalize ${IFS} before scan"
+
+  - id: keyword_single_quotes
+    name: "w'h'o'am'i"
+    priority: 40
+    transform: keyword_single_quotes
+    exclusive_group: keyword_obf
+    triggers:
+      blocked_keywords: ["*"]
+    requires_not_blocked: ["'"]
+    references:
+      - "PAT: Bypass With Single Quote"
+      - "Commix: singlequotes"
+    defense:
+      - "Allowlist commands; quotes alone are insufficient"
+
+  - id: keyword_double_quotes
+    name: 'w"h"o"am"i'
+    priority: 41
+    transform: keyword_double_quotes
+    exclusive_group: keyword_obf
+    triggers:
+      blocked_keywords: ["*"]
+    requires_not_blocked: ['"']
+    references:
+      - "PAT: Bypass With Double Quote"
+      - "Commix: doublequotes"
+    defense:
+      - "Normalize quotes before keyword matching"
+
+  - id: keyword_backticks
+    name: "wh``oami"
+    priority: 42
+    transform: keyword_backticks
+    exclusive_group: keyword_obf
+    triggers:
+      blocked_keywords: ["*"]
+    requires_not_blocked: ["`"]
+    references:
+      - "PAT: Bypass With Backticks"
+    defense:
+      - "Block backticks in parameters"
+
+  - id: keyword_dollar_at
+    name: "who$@ami"
+    priority: 43
+    transform: keyword_dollar_at
+    exclusive_group: keyword_obf
+    triggers:
+      blocked_keywords: ["*"]
+    requires_not_blocked: ["$", "@"]
+    references:
+      - "PAT: Bypass With $@"
+      - "Commix: dollaratsigns"
+    defense:
+      - "Detect $@ splitting in logs"
+
+  - id: keyword_backslash
+    name: "w\\ho\\am\\i"
+    priority: 44
+    transform: keyword_backslash
+    exclusive_group: keyword_obf
+    triggers:
+      blocked_keywords: ["*"]
+    requires_not_blocked: ["\\"]
+    references:
+      - "PAT: Bypass With Backslash"
+      - "Commix: backslashes"
+    defense:
+      - "Strip or reject embedded backslashes"
+
+  - id: keyword_uninit_var
+    name: "w${AB}ho${CD}ami"
+    priority: 45
+    transform: keyword_uninit_var
+    exclusive_group: keyword_obf
+    triggers:
+      blocked_keywords: ["*"]
+    requires_not_blocked: ["$", "{", "}"]
+    references:
+      - "Commix: uninitializedvariable"
+    defense:
+      - "Block ${...} in untrusted fields"
+
+  - id: command_reverse
+    name: "Reversed command via echo|rev"
+    priority: 46
+    transform: command_reverse
+    exclusive_group: keyword_obf
+    triggers:
+      blocked_keywords: ["*"]
+    requires_not_blocked: ["$", "(", ")", "|"]
+    references:
+      - "Commix: rev tamper"
+      - "PAT: $(rev<<<...)"
+    defense:
+      - "Detect rev| pipeline abuse"
+
+  - id: wildcard_command
+    name: "Glob-style command (/???/c?t)"
+    priority: 47
+    transform: wildcard_command
+    triggers:
+      blocked_keywords: ["*"]
+    requires_not_blocked: ["?", "*", "/"]
+    references:
+      - "PAT: Bypass With Wildcards"
+    notes: "Maps cat->/???/c?t, whoami->/???/w??m??, etc."
+    defense:
+      - "Allowlist binaries by full path"

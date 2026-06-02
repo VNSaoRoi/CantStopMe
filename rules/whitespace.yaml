@@ -1,0 +1,82 @@
+# Space / whitespace bypasses (PAT + Commix tampers)
+category: whitespace
+rules:
+  - id: space_ifs
+    name: "IFS instead of space"
+    priority: 20
+    transform: space_to_ifs
+    exclusive_group: whitespace
+    triggers:
+      blocked_tokens: ["space"]
+    requires_not_blocked: ["$"]
+    references:
+      - "PAT: Bypass Without Space"
+      - "Commix: space2ifs"
+    defense:
+      - "Block $IFS and ${IFS} in WAF"
+
+  - id: space_tab
+    name: "TAB percent-09 instead of space"
+    priority: 21
+    transform: space_to_tab
+    exclusive_group: whitespace
+    contexts: [web_cmd_inject]
+    triggers:
+      blocked_tokens: ["space"]
+    notes: "Uses literal %09 only with --url-encode; otherwise real TAB (shell)"
+    references:
+      - "PAT: tab as space"
+      - "Commix: space2htab"
+    defense:
+      - "Reject tab in single-line parameters"
+
+  - id: space_plus
+    name: "Plus instead of space (URL)"
+    priority: 22
+    transform: space_to_plus
+    exclusive_group: whitespace
+    contexts: [web_cmd_inject]
+    triggers:
+      blocked_tokens: ["space"]
+    references:
+      - "Commix: space2plus"
+    defense:
+      - "Normalize + in application/x-www-form-urlencoded carefully"
+
+  - id: brace_expansion_path
+    name: "Brace expansion cmd,arg"
+    priority: 23
+    transform: brace_expansion_path
+    exclusive_group: whitespace
+    triggers:
+      blocked_tokens: ["space"]
+    requires_not_blocked: ["{", "}", ","]
+    references:
+      - "PAT: Bypass With Brace Expansion"
+    defense:
+      - "Reject { } , in strict allowlists"
+
+  - id: input_redirection
+    name: "cat input redirection"
+    priority: 24
+    transform: input_redirection
+    triggers:
+      blocked_keywords: ["cat"]
+    requires_not_blocked: ["<"]
+    references:
+      - "PAT: cat</etc/passwd"
+    defense:
+      - "Block < and > in user input"
+
+  - id: ansi_c_whitespace
+    name: "ANSI-C quoting for spaces"
+    priority: 25
+    transform: ansi_c_spaces
+    exclusive_group: whitespace
+    triggers:
+      blocked_tokens: ["space"]
+    requires_not_blocked: ["$", "'"]
+    references:
+      - "PAT: X=$'uname\\x20-a'&&$X"
+    defense:
+      - "Block $'...' ANSI-C strings if not needed"

@@ -1,0 +1,21 @@
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local reference clones (PAT, Commix, …) — not shipped
+_reference/
+
+# IDE / OS
+.idea/
+.vscode/
+.cursor/
+*.swp
+Thumbs.db
+.DS_Store

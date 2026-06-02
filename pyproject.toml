@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cantstopme"
+version = "0.1.0"
+description = "Bash command obfuscation against blacklists — for authorized security labs (Kali/Linux)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+  "PyYAML>=6.0",
+]
+
+[project.scripts]
+cantstopme = "cantstopme.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["cantstopme*"]
+
+# rules/ and blacklist_pool/ live at repo root; use pip install -e . from clone root.

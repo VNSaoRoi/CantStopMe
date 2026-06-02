@@ -1,0 +1,90 @@
+# Advanced bypasses — PAT, Commix tampers, HackTricks, WAF evasion
+category: advanced
+rules:
+  - id: tr_dot_slash
+    name: "Slash via tr on dot (PAT)"
+    priority: 35
+    transform: tr_dot_slash
+    exclusive_group: slash
+    contexts: [bash, sh, restrictive_waf]
+    triggers:
+      blocked_chars: ["/"]
+    requires_not_blocked: ["$", "(", ")", "|", "!"]
+    references:
+      - "PAT: echo . | tr '!-0' '\"-1'"
+      - "https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/Command%20Injection"
+    defense:
+      - "Block tr and $() chains on user input"
+
+  - id: xxd_slash_path
+    name: "Path from xxd -r -p hex"
+    priority: 34
+    transform: xxd_slash_path
+    exclusive_group: slash
+    contexts: [bash, sh, general]
+    triggers:
+      blocked_chars: ["/"]
+    requires_not_blocked: ["$", "<"]
+    references:
+      - "PAT: xxd -r -p <<< 2f6574632f706173737764"
+    defense:
+      - "Block xxd and here-strings"
+
+  - id: base64_wrap_command
+    name: "Whole command base64 | bash"
+    priority: 56
+    transform: base64_wrap_command
+    exclusive_group: encoding_deep
+    reference_only: true
+    contexts: [bash, sh, restrictive_waf]
+    triggers:
+      blocked_keywords: ["*"]
+    requires_not_blocked: ["|", "$"]
+    references:
+      - "HackTricks / Medium: echo b64 | base64 -d | bash"
+      - "https://book.hacktricks.xyz/pentesting-web/command-injection"
+    notes: "Reference variant — long payload; light WAF labs only"
+    defense:
+      - "Block base64 -d pipelines to bash"
+
+  - id: keyword_dollar_empty_paren
+    name: "who$()ami empty command substitution"
+    priority: 42
+    transform: keyword_dollar_empty_paren
+    exclusive_group: keyword_obf
+    contexts: [bash, sh, zsh, web_cmd_inject]
+    triggers:
+      blocked_keywords: ["*"]
+    requires_not_blocked: ["$", "(", ")"]
+    references:
+      - "PAT: Bypass With $()"
+    defense:
+      - "Reject $() with empty body"
+
+  - id: space_vertical_tab
+    name: "Vertical tab / %0b as space"
+    priority: 26
+    transform: space_vertical_tab
+    exclusive_group: whitespace
+    contexts: [web_cmd_inject]
+    triggers:
+      blocked_tokens: ["space"]
+    references:
+      - "Commix: space2vtab"
+    defense:
+      - "Reject %0b and vertical tab in parameters"
+
+  - id: chain_and_separator
+    name: "Replace ; with &&"
+    priority: 9
+    transform: chain_and_separator
+    exclusive_group: cmd_separator
+    contexts: [general, web_cmd_inject, php_wrapper, bash]
+    triggers:
+      blocked_chars: [";"]
+    requires_not_blocked: ["&"]
+    references:
+      - "PortSwigger: command chaining"
+      - "https://portswigger.net/web-security/os-command-injection"
+    defense:
+      - "Block && and ; in one policy"
