@@ -1,0 +1,2 @@
+# Strict overlay: block $ (forces %09 / + / brace instead of ${IFS})
+char:$

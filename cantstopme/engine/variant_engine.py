@@ -25,9 +25,13 @@ def _score_payload(payload: str, report: ObfuscationReport, *, original: str) ->
         return 0
     score = len(report.rules_applied) * 10 + len(report.transforms_applied)
     if "${IFS}" in payload:
-        score += 12
+        score += 20
+    if "%09" in payload or "%0b" in payload:
+        score -= 18
     if "%20" in payload:
         score -= 15
+    if "+" in payload and " " not in payload and "${IFS}" not in payload:
+        score -= 12
     if "%%" in payload:
         score -= 8
     if "${HOME:0:1}" in payload:

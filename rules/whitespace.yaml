@@ -2,8 +2,8 @@
 category: whitespace
 rules:
   - id: space_ifs
-    name: "IFS instead of space"
-    priority: 20
+    name: "IFS instead of space (${IFS})"
+    priority: 18
     transform: space_to_ifs
     exclusive_group: whitespace
     triggers:
@@ -20,10 +20,10 @@ rules:
     priority: 21
     transform: space_to_tab
     exclusive_group: whitespace
-    contexts: [web_cmd_inject]
     triggers:
       blocked_tokens: ["space"]
-    notes: "Uses literal %09 only with --url-encode; otherwise real TAB (shell)"
+    requires_blocked: ["$"]
+    notes: "Fallback when $ is blocked; prefer space_ifs otherwise"
     references:
       - "PAT: tab as space"
       - "Commix: space2htab"
@@ -35,9 +35,9 @@ rules:
     priority: 22
     transform: space_to_plus
     exclusive_group: whitespace
-    contexts: [web_cmd_inject]
     triggers:
       blocked_tokens: ["space"]
+    requires_blocked: ["$"]
     references:
       - "Commix: space2plus"
     defense:

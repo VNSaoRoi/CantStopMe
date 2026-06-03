@@ -95,10 +95,41 @@ def newline_cr_prefix(
     return TransformResult(payload, applied=["newline_cr_prefix"], hints=["CR / %0d"])
 
 
+def _embedded_substring(text: str, start: int, length: int) -> bool:
+    if start > 0 and (text[start - 1].isalnum() or text[start - 1] == "_"):
+        return True
+    end = start + length
+    if end < len(text) and (text[end].isalnum() or text[end] == "_"):
+        return True
+    return False
+
+
+def _replace_standalone_substring(text: str, needle: str, replacement: str) -> str:
+    """Replace only non-embedded occurrences (e.g. cp in TCP stays, standalone cp splits)."""
+    if needle not in text:
+        return text
+    out: list[str] = []
+    pos = 0
+    while True:
+        idx = text.find(needle, pos)
+        if idx < 0:
+            out.append(text[pos:])
+            break
+        if _embedded_substring(text, idx, len(needle)):
+            out.append(text[pos : idx + len(needle)])
+            pos = idx + len(needle)
+            continue
+        out.append(text[pos:idx])
+        out.append(replacement)
+        pos = idx + len(needle)
+    return "".join(out)
+
+
 def break_blocked_substrings(command: str, bl: Blacklist, **_) -> TransformResult:
     """Split blocked keyword substrings (e.g. cp in TCP) so filters miss a contiguous match."""
     if bl.blocks_char("$"):
         return TransformResult(command)
+    tokens = _command_parts(command)
     out = command
     applied: list[str] = []
     for kw in sorted(bl.keywords, key=len, reverse=True):
@@ -110,10 +141,18 @@ def break_blocked_substrings(command: str, bl: Blacklist, **_) -> TransformResul
         for needle in variants:
             if needle not in out:
                 continue
+            nl = needle.lower()
+            if any(
+                nl in tok.lower() and (len(tok) > len(needle) or tok.lower() == nl)
+                for tok in tokens
+            ):
+                continue
             mid = len(needle) // 2
             replacement = needle[:mid] + "${IFS}" + needle[mid:]
-            out = out.replace(needle, replacement)
-            applied.append(f"break_substring:{needle}")
+            new_out = _replace_standalone_substring(out, needle, replacement)
+            if new_out != out:
+                out = new_out
+                applied.append(f"break_substring:{needle}")
     if not applied:
         return TransformResult(command)
     return TransformResult(out, applied=applied, hints=["${IFS} breaks substring keyword match"])

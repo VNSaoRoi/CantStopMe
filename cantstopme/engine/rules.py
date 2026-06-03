@@ -21,6 +21,7 @@ class Rule:
     target: str
     triggers: dict[str, Any] = field(default_factory=dict)
     requires_not_blocked: list[str] = field(default_factory=list)
+    requires_blocked: list[str] = field(default_factory=list)
     references: list[str] = field(default_factory=list)
     notes: str = ""
     defense: list[str] = field(default_factory=list)
@@ -32,6 +33,12 @@ class Rule:
     def applies(self, bl: Blacklist, command: str) -> bool:
         for ch in self.requires_not_blocked:
             if bl.blocks_char(ch):
+                return False
+        for ch in self.requires_blocked:
+            if ch == "space":
+                if not bl.blocks_space():
+                    return False
+            elif not bl.blocks_char(ch):
                 return False
 
         blocked_chars = self.triggers.get("blocked_chars") or []
@@ -98,6 +105,7 @@ def _rule_from_dict(data: dict, category: str = "") -> Rule:
         target=data.get("target", "whole_command"),
         triggers=data.get("triggers", {}),
         requires_not_blocked=list(data.get("requires_not_blocked") or []),
+        requires_blocked=list(data.get("requires_blocked") or []),
         references=list(data.get("references") or []),
         notes=data.get("notes", "") or "",
         defense=list(data.get("defense") or []),

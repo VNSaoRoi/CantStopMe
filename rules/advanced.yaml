@@ -66,9 +66,9 @@ rules:
     priority: 26
     transform: space_vertical_tab
     exclusive_group: whitespace
-    contexts: [web_cmd_inject]
     triggers:
       blocked_tokens: ["space"]
+    requires_blocked: ["$"]
     references:
       - "Commix: space2vtab"
     defense:

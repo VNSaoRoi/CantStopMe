@@ -6,7 +6,6 @@ version: 3
 # Shell metacharacters & operators (PAT chaining + ch53 preg_replace + Commix filters)
 characters:
   - backslash
-  - "$"
   - "|"
   - "`"
   - ";"

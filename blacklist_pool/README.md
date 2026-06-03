@@ -26,3 +26,5 @@ space
 ```
 
 Use `-b file` alone for that file only; add `--use-pool` to merge with `pool.yaml`.
+
+`pool.yaml` does not block `$` by default so ranked payloads use **`${IFS}`** for spaces. For strict WAF labs that block `$`, use `-b examples/dollar_blocked.txt` (falls back to `%09` / `+`).
