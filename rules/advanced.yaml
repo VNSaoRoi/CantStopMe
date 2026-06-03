@@ -68,7 +68,6 @@ rules:
     exclusive_group: whitespace
     triggers:
       blocked_tokens: ["space"]
-    requires_blocked: ["$"]
     references:
       - "Commix: space2vtab"
     defense:

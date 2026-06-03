@@ -1,7 +1,8 @@
-"""Generate ranked obfuscated payload variants."""
+"""Generate ranked obfuscated payload variants (full cross-product per bypass group)."""
 
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -9,7 +10,10 @@ from cantstopme.engine.blacklist import resolve_blacklist
 from cantstopme.engine.command_alternatives import applicable_substitutes
 from cantstopme.engine.constants import DEFAULT_TOP_PAYLOADS
 from cantstopme.engine.obfuscator import CMD_INJECT_TRANSFORMS, ObfuscationReport, obfuscate
-from cantstopme.engine.rules import KEYWORD_STYLE_TO_TRANSFORM, select_rules
+from cantstopme.engine.rules import KEYWORD_STYLE_TO_TRANSFORM, Rule, select_rules
+
+_MAX_COMBO_ATTEMPTS = 200
+_PRODUCT_GROUPS = ("whitespace", "slash", "keyword_obf", "cmd_separator")
 
 
 @dataclass
@@ -64,6 +68,67 @@ def _collect_variant(
     )
 
 
+def _rules_by_group(matched: list[Rule], *, prefix_ping: bool) -> dict[str, list[Rule]]:
+    by_group: dict[str, list[Rule]] = {}
+    for rule in matched:
+        if not rule.exclusive_group:
+            continue
+        if rule.transform in CMD_INJECT_TRANSFORMS and not prefix_ping:
+            continue
+        if rule.exclusive_group == "cmd_substitute":
+            continue
+        if rule.exclusive_group == "encoding_deep":
+            continue
+        by_group.setdefault(rule.exclusive_group, []).append(rule)
+    return by_group
+
+
+def _combo_label(force: dict[str, str]) -> str:
+    if not force:
+        return "primary"
+    return "+".join(f"{g}={v}" for g, v in sorted(force.items()))
+
+
+def _enumerate_force_combos(
+    by_group: dict[str, list[Rule]],
+    *,
+    prefix_ping: bool,
+) -> list[dict[str, str]]:
+    """
+    Full cross-product: one transform per group (whitespace x slash x keyword x …).
+    Avoids single-group forces that silently reuse primary picks for other groups.
+    """
+    active_groups: list[str] = []
+    choices_per_group: list[list[tuple[str, str]]] = []
+
+    for group in _PRODUCT_GROUPS:
+        if group == "cmd_separator" and not prefix_ping:
+            continue
+        rules = by_group.get(group)
+        if not rules:
+            continue
+        active_groups.append(group)
+        choices_per_group.append([(group, r.transform) for r in rules])
+
+    if not active_groups:
+        return []
+
+    combos: list[dict[str, str]] = []
+    seen: set[frozenset[tuple[str, str]]] = set()
+
+    for picks in itertools.product(*choices_per_group):
+        if len(combos) >= _MAX_COMBO_ATTEMPTS:
+            break
+        force = {g: transform for g, transform in picks}
+        key = frozenset(force.items())
+        if key in seen:
+            continue
+        seen.add(key)
+        combos.append(force)
+
+    return combos
+
+
 def generate_top_payloads(
     command: str,
     *,
@@ -74,12 +139,18 @@ def generate_top_payloads(
     prefer_keyword: str = "single_quotes",
     limit: int = DEFAULT_TOP_PAYLOADS,
 ) -> list[RankedPayload]:
-    """Return up to `limit` unique payloads, best first."""
+    """Return up to `limit` unique payloads (cross-product of group-level bypasses)."""
     if limit < 1:
         return []
 
-    primary = obfuscate(
-        command,
+    bl = resolve_blacklist(blacklist_path, use_pool=use_pool)
+    matched = select_rules(bl, command)
+    by_group = _rules_by_group(matched, prefix_ping=prefix_ping)
+
+    ranked: list[RankedPayload] = []
+    seen: set[str] = {command}
+
+    base_kw = dict(
         blacklist_path=blacklist_path,
         use_pool=use_pool,
         url_encode=url_encode,
@@ -87,35 +158,32 @@ def generate_top_payloads(
         prefix_ping=prefix_ping,
     )
 
-    ranked: list[RankedPayload] = [
-        RankedPayload(
-            payload=primary.payload,
-            label="primary",
-            rules_applied=list(primary.rules_applied),
-            score=_score_payload(primary.payload, primary, original=command),
+    primary = obfuscate(command, **base_kw)
+    _collect_variant(
+        command=command,
+        seen=seen,
+        out=ranked,
+        report=primary,
+        label="primary",
+    )
+
+    for force in _enumerate_force_combos(by_group, prefix_ping=prefix_ping):
+        report = obfuscate(command, force_transforms=force, **base_kw)
+        _collect_variant(
+            command=command,
+            seen=seen,
+            out=ranked,
+            report=report,
+            label=_combo_label(force),
         )
-    ]
-    seen: set[str] = {primary.payload, command}
-
-    bl = resolve_blacklist(blacklist_path, use_pool=use_pool)
-    matched = select_rules(bl, command)
-
-    by_group: dict[str, list] = {}
-    for rule in matched:
-        if rule.exclusive_group:
-            by_group.setdefault(rule.exclusive_group, []).append(rule)
 
     for alt in applicable_substitutes(command, bl):
-        if len(ranked) >= limit * 3:
+        if len(ranked) >= limit * 4:
             break
         report = obfuscate(
             command,
-            blacklist_path=blacklist_path,
-            use_pool=use_pool,
-            url_encode=url_encode,
-            prefer_keyword=prefer_keyword,
-            prefix_ping=prefix_ping,
             force_transforms={"cmd_substitute": alt.id},
+            **base_kw,
         )
         _collect_variant(
             command=command,
@@ -125,68 +193,16 @@ def generate_top_payloads(
             label=f"cmd_substitute={alt.id}",
         )
 
-    for group, rules in sorted(by_group.items()):
-        for rule in rules:
-            if len(ranked) >= limit * 3:
-                break
-            if rule.transform in CMD_INJECT_TRANSFORMS and not prefix_ping:
-                continue
-            if group in ("keyword_obf", "cmd_substitute"):
-                continue
-            report = obfuscate(
-                command,
-                blacklist_path=blacklist_path,
-                use_pool=use_pool,
-                url_encode=url_encode,
-                prefer_keyword=prefer_keyword,
-                prefix_ping=prefix_ping,
-                force_transforms={group: rule.transform},
-            )
-            _collect_variant(
-                command=command,
-                seen=seen,
-                out=ranked,
-                report=report,
-                label=f"{group}={rule.id}",
-            )
-
-    if any(r.exclusive_group == "keyword_obf" for r in matched):
-        for style, transform in KEYWORD_STYLE_TO_TRANSFORM.items():
-            if len(ranked) >= limit * 3:
-                break
-            if style == prefer_keyword:
-                continue
-            report = obfuscate(
-                command,
-                blacklist_path=blacklist_path,
-                use_pool=use_pool,
-                url_encode=url_encode,
-                prefer_keyword=style,
-                prefix_ping=prefix_ping,
-                force_transforms={"keyword_obf": transform},
-            )
-            _collect_variant(
-                command=command,
-                seen=seen,
-                out=ranked,
-                report=report,
-                label=f"keyword_obf={style}",
-            )
-
     bash_rules = [
         r
         for r in select_rules(bl, command, include_reference_only=True)
         if r.transform == "bash_binary_c"
     ]
-    if bash_rules:
+    if bash_rules and len(ranked) < limit:
         report = obfuscate(
             command,
-            blacklist_path=blacklist_path,
-            use_pool=use_pool,
-            url_encode=url_encode,
-            prefer_keyword=prefer_keyword,
-            prefix_ping=prefix_ping,
             force_transforms={"encoding_deep": "bash_binary_c"},
+            **base_kw,
         )
         _collect_variant(
             command=command,
@@ -197,8 +213,6 @@ def generate_top_payloads(
         )
 
     ranked.sort(key=lambda r: r.score, reverse=True)
-    # Keep stable order for ties: primary first among equal scores
-    prim = ranked[0]
-    rest = [r for r in ranked[1:] if r.payload != prim.payload]
-    ordered = [prim] + rest
-    return ordered[:limit]
+    primary_entry = next((r for r in ranked if r.label == "primary"), ranked[0])
+    rest = [r for r in ranked if r.label != "primary" and r.payload != primary_entry.payload]
+    return ([primary_entry] + rest)[:limit]

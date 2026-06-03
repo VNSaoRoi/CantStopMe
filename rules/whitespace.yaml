@@ -16,14 +16,13 @@ rules:
       - "Block $IFS and ${IFS} in WAF"
 
   - id: space_tab
-    name: "TAB percent-09 instead of space"
+    name: "TAB / percent-09 instead of space"
     priority: 21
     transform: space_to_tab
     exclusive_group: whitespace
     triggers:
       blocked_tokens: ["space"]
-    requires_blocked: ["$"]
-    notes: "Fallback when $ is blocked; prefer space_ifs otherwise"
+    notes: "Literal TAB, or %09 with --url-encode; cross-product variant when ${IFS} not desired"
     references:
       - "PAT: tab as space"
       - "Commix: space2htab"
@@ -37,7 +36,6 @@ rules:
     exclusive_group: whitespace
     triggers:
       blocked_tokens: ["space"]
-    requires_blocked: ["$"]
     references:
       - "Commix: space2plus"
     defense:
