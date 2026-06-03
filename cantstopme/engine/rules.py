@@ -79,7 +79,13 @@ class Rule:
                 if not any(
                     bl.blocks_keyword(kw) and kw in tokens for kw in blocked_keywords
                 ):
-                    return False
+                    cmd_lower = command.lower()
+                    if not any(
+                        bl.blocks_keyword(kw)
+                        and kw.lower() in cmd_lower
+                        for kw in blocked_keywords
+                    ):
+                        return False
         return True
 
 

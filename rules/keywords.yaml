@@ -1,8 +1,19 @@
 # Command-name obfuscation (PAT + Commix tampers)
 category: keywords
 rules:
+  - id: break_short_substrings
+    name: "Split 2-char blocked substrings (cp in TCP)"
+    priority: 4
+    transform: break_short_substrings
+    triggers:
+      blocked_keywords: [cp, ip, id, rm, mv, cd, ln, ps, nc, ls]
+    requires_not_blocked: ["$"]
+    notes: "Splits 2-char filter hits inside tokens (cp in TCP); not whole words like bash"
+    references:
+      - "PHP filter substring match on TCP, ip in script, etc."
+
   - id: break_blocked_substrings
-    name: "Break substring keyword hits (cp in TCP, …)"
+    name: "Break standalone substring keyword hits"
     priority: 5
     transform: break_blocked_substrings
     triggers:
